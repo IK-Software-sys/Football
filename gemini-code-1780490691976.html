@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Gridlock - Directors Cut</title>
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0a0a12;
+            --panel-bg: rgba(25, 25, 35, 0.85);
+            --text-color: #e2e8f0;
+            --accent-red: #ff3366;
+            --accent-blue: #00f0ff;
+            --accent-wall: #ffaa00;
+            --border-glow: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            touch-action: none; /* Crucial for custom drag and drop on mobile */
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(255, 51, 102, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(0, 240, 255, 0.1) 0px, transparent 50%);
+        }
+
+        #network-panel, #game-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glow);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+
+        h3 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            text-align: center;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            background: linear-gradient(45deg, var(--accent-red), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .description {
+            font-size: 13px;
+            color: #94a3b8;
+            text-align: center;
+            line-height: 1.4;
+            margin-bottom: 15px;
+        }
+
+        #my-id {
+            color: var(--accent-blue);
+            background: rgba(0, 240, 255, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+            display: inline-block;
+        }
+
+        input {
+            background: rgba(25, 25, 35, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #00b4d8, #0077b6);
+            border: none;
+            color: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 100%;
+        }
+
+        #game-panel {
+            display: none;
+        }
+
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        #status {
+            font-weight: bold;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #mute-btn {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.1);
+            width: auto;
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 20px;
+        }
+
+        .canvas-container {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        canvas {
+            background: #12121c;
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Drag and Drop Dock Layout */
+        .dock-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #64748b;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .wall-dock {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px dashed rgba(255,255,255,0.1);
+            gap: 15px;
+        }
+
+        .dock-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: grab;
+            user-select: none;
+            flex: 1;
+            padding: 5px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+        }
+
+        .dock-item:active {
+            cursor: grabbing;
+        }
+
+        .wall-sprite {
+            background: var(--accent-wall);
+            box-shadow: 0 0 10px var(--accent-wall);
+            border-radius: 4px;
+        }
+
+        .h-sprite {
+            width: 70px;
+            height: 10px;
+            margin: 15px 0;
+        }
+
+        .v-sprite {
+            width: 10px;
+            height: 70px;
+        }
+
+        .dock-item span {
+            font-size: 11px;
+            font-weight: bold;
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="network-panel">
+        <h3>Neon Gridlock</h3>
+        <p class="description">
+            <b>Objective:</b> Navigate your core orb to the opposite edge of the board. On your turn, tap an adjacent cell to step forward, OR drag a light barrier from the dock below to sabotage your enemy's path. Complete traps are forbidden by system firewalls!
+        </p>
+        <p style="text-align:center; margin-bottom:15px;">Your Core ID:<br><strong id="my-id">Initializing...</strong></p>
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 15px 0;">
+        <input type="text" id="opponent-id" placeholder="Enter Enemy Core ID">
+        <button id="connect-btn">Establish Link</button>
+        <p id="connection-status" style="text-align:center; color: var(--accent-wall); font-size:13px; margin-top: 10px;"></p>
+    </div>
+
+    <div id="game-panel">
+        <div class="header-row">
+            <div id="status">Syncing System...</div>
+            <button id="mute-btn" onclick="toggleMute()">🔊 MUTE</button>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="gameCanvas" width="360" height="360"></canvas>
+        </div>
+
+        <div class="dock-label">Drag Barrier to Deploy</div>
+        <div class="wall-dock">
+            <div class="dock-item" id="dock-hwall" silverware="h">
+                <div class="wall-sprite h-sprite"></div>
+                <span>H-BARRIER</span>
+            </div>
+            <div class="dock-item" id="dock-vwall" silverware="v">
+                <div class="wall-sprite v-sprite"></div>
+                <span>V-BARRIER</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio & SFX Engine ---
+        const bgMusic = new Audio('SONG1.mp3');
+        bgMusic.loop = true;
+        let isMuted = false;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (!isMuted) {
+                bgMusic.play().catch(e => console.log("Audio waiting for user click interaction."));
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            bgMusic.muted = isMuted;
+            document.getElementById('mute-btn').innerText = isMuted ? "🔇 UNMUTE" : "🔊 MUTE";
+        }
+
+        function playSynthSFX(type) {
+            if (isMuted || !audioCtx) return;
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'move') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'wall') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.linearRampToValueAtTime(90, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, now);
+                osc.frequency.setValueAtTime(110, now + 0.08);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            } else if (type === 'win') {
+                osc.type = 'sine';
+                [440, 554, 659, 880].forEach((f, i) => {
+                    const noteOsc = audioCtx.createOscillator();
+                    const noteGain = audioCtx.createGain();
+                    noteOsc.type = 'sine';
+                    noteOsc.frequency.setValueAtTime(f, now + i * 0.1);
+                    noteGain.gain.setValueAtTime(0.15, now + i * 0.1);
+                    noteGain.gain.linearRampToValueAtTime(0, now + i * 0.1 + 0.3);
+                    noteOsc.connect(noteGain);
+                    noteGain.connect(audioCtx.destination);
+                    noteOsc.start(now + i * 0.1);
+                    noteOsc.stop(now + i * 0.1 + 0.3);
+                });
+            }
+        }
+
+        // --- Network & P2P Setup ---
+        const peerConfig = {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
+        };
+
+        const peer = new Peer(peerConfig);
+        let conn = null;
+        let myRole = null; 
+        const statusText = document.getElementById('connection-status');
+
+        peer.on('open', (id) => {
+            document.getElementById('my-id').innerText = id;
+            statusText.innerText = "Ready for secure connection link.";
+        });
+
+        peer.on('error', (err) => {
+            statusText.innerText = `Network issue: ${err.type}`;
+        });
+
+        peer.on('connection', (incomingConn) => {
+            conn = incomingConn;
+            setupConnection();
+            startGameAs('red');
+        });
+
+        document.getElementById('connect-btn').onclick = () => {
+            const oppId = document.getElementById('opponent-id').value.trim();
+            if (!oppId) return;
+            statusText.innerText = "Routing stream tunnels...";
+            conn = peer.connect(oppId, { reliable: true });
+            conn.on('open', () => {
+                setupConnection();
+                startGameAs('blue');
+            });
+        };
+
+        function setupConnection() {
+            initAudio();
+            document.getElementById('network-panel').style.display = 'none';
+            document.getElementById('game-panel').style.display = 'block';
+            
+            conn.on('data', (data) => {
+                if (data.type === 'move') {
+                    if (myRole === 'red') { p2.x = data.x; p2.y = data.y; }
+                    else { p1.x = data.x; p1.y = data.y; }
+                    playSynthSFX('move');
+                } else if (data.type === 'wall') {
+                    walls.push({ x: data.x, y: data.y, type: data.wallType });
+                    playSynthSFX('wall');
+                }
+                currentTurn = (currentTurn === 'red') ? 'blue' : 'red';
+                updateStatus();
+                draw();
+            });
+
+            conn.on('close', () => {
+                alert("Link broken by opponent.");
+                location.reload();
+            });
+        }
+
+        // --- Game Core Rules ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gridSize = 9;
+        const cellSize = canvas.width / gridSize;
+        
+        let p1 = { x: 4, y: 8 }; 
+        let p2 = { x: 4, y: 0 }; 
+        let walls = []; 
+        let currentTurn = 'red';
+
+        // Drag State Mechanics
+        let activeDragType = null; // 'h' or 'v'
+        let currentPointerGrid = null; // {x, y} inside canvas grid
+
+        function startGameAs(role) {
+            myRole = role;
+            updateStatus();
+            setupDragAndDrop();
+            draw();
+        }
+
+        function updateStatus() {
+            const statusDiv = document.getElementById('status');
+            if (currentTurn === myRole) {
+                statusDiv.innerText = "YOUR ACTION";
+                statusDiv.style.color = myRole === 'red' ? 'var(--accent-red)' : 'var(--accent-blue)';
+                statusDiv.style.textShadow = `0 0 15px ${statusDiv.style.color}`;
+            } else {
+                statusDiv.innerText = "ENEMY ACTION";
+                statusDiv.style.color = "rgba(255,255,255,0.3)";
+                statusDiv.style.textShadow = "none";
+            }
+        }
+
+        function hasWallBlock(x1, y1, x2, y2) {
+            if (x1 === x2) { 
+                let minY = Math.min(y1, y2);
+                for (let w of walls) {
+                    if (w.type === 'h' && w.y === minY && (x1 >= w.x && x1 <= w.x + 2)) return true;
+                }
+            } else if (y1 === y2) { 
+                let minX = Math.min(x1, x2);
+                for (let w of walls) {
+                    if (w.type === 'v' && w.x === minX && (y1 >= w.y && y1 <= w.y + 2)) return true;
+                }
+            }
+            return false;
+        }
+
+        function canReachGoal(player, targetY) {
+            let queue = [{ x: player.x, y: player.y }];
+            let visited = new Set([`${player.x},${player.y}`]);
+
+            while (queue.length > 0) {
+                let curr = queue.shift();
+                if (curr.y === targetY) return true;
+
+                const moves = [
+                    { x: curr.x, y: curr.y - 1 }, { x: curr.x, y: curr.y + 1 },
+                    { x: curr.x - 1, y: curr.y }, { x: curr.x + 1, y: curr.y }
+                ];
+
+                for (let m of moves) {
+                    if (m.x >= 0 && m.x < gridSize && m.y >= 0 && m.y < gridSize) {
+                        if (!hasWallBlock(curr.x, curr.y, m.x, m.y)) {
+                            if (!visited.has(`${m.x},${m.y}`)) {
+                                visited.add(`${m.x},${m.y}`);
+                                queue.push(m);
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function isValidWall(wx, wy, type) {
+            if (type === 'h' && (wx > 6 || wy >= 8)) return false;
+            if (type === 'v' && (wy > 6 || wx >= 8)) return false;
+            if (wx < 0 || wy < 0) return false;
+
+            for (let w of walls) {
+                if (w.type === type) {
+                    if (type === 'h' && w.y === wy && Math.abs(w.x - wx) < 3) return false;
+                    if (type === 'v' && w.x === wx && Math.abs(w.y - wy) < 3) return false;
+                } else {
+                    if (type === 'h' && w.type === 'v') {
+                        if (wx <= w.x && wx + 2 >= w.x && wy >= w.y && wy <= w.y + 2) return false;
+                    }
+                    if (type === 'v' && w.type === 'h') {
+                        if (wy <= w.y && wy + 2 >= w.y && wx >= w.x && wx <= w.x + 2) return false;
+                    }
+                }
+            }
+
+            walls.push({ x: wx, y: wy, type: type });
+            let p1CanWin = canReachGoal(p1, 0);
+            let p2CanWin = canReachGoal(p2, 8);
+            walls.pop(); 
+
+            return p1CanWin && p2CanWin;
+        }
+
+        // --- Unified Interaction Control (Move & Drag Setup) ---
+        function setupDragAndDrop() {
+            const hDock = document.getElementById('dock-hwall');
+            const vDock = document.getElementById('dock-vwall');
+
+            hDock.addEventListener('pointerdown', (e) => startDrag(e, 'h'));
+            vDock.addEventListener('pointerdown', (e) => startDrag(e, 'v'));
+
+            window.addEventListener('pointermove', processDrag);
+            window.addEventListener('pointerup', completeDrag);
+        }
+
+        function startDrag(e, type) {
+            if (currentTurn !== myRole) return;
+            initAudio(); // Backup context resume
+            activeDragType = type;
+            updatePointerGridPosition(e);
+            e.preventDefault();
+        }
+
+        function processDrag(e) {
+            if (!activeDragType) return;
+            updatePointerGridPosition(e);
+            draw();
+        }
+
+        function completeDrag(e) {
+            if (!activeDragType) return;
+
+            if (currentPointerGrid) {
+                const { x, y } = currentPointerGrid;
+                if (isValidWall(x, y, activeDragType)) {
+                    walls.push({ x, y, type: activeDragType });
+                    conn.send({ type: 'wall', x, y, wallType: activeDragType });
+                    playSynthSFX('wall');
+                    endTurn();
+                } else {
+                    playSynthSFX('error');
+                }
+            }
+
+            activeDragType = null;
+            currentPointerGrid = null;
+            draw();
+        }
+
+        function updatePointerGridPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX;
+            const clientY = e.clientY;
+
+            if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                const cx = clientX - rect.left;
+                const cy = clientY - rect.top;
+                const gridX = Math.floor((cx / rect.width) * gridSize);
+                const gridY = Math.floor((cy / rect.height) * gridSize);
+                currentPointerGrid = { x: gridX, y: gridY };
+            } else {
+                currentPointerGrid = null;
+            }
+        }
+
+        // Handle Standard Board Tapping to step/move node forward
+        canvas.addEventListener('click', (e) => {
+            if (currentTurn !== myRole || activeDragType) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const cx = e.clientX - rect.left;
+            const cy = e.clientY - rect.top;
+            const gridX = Math.floor((cx / rect.width) * gridSize);
+            const gridY = Math.floor((cy / rect.height) * gridSize);
+
+            const me = (myRole === 'red') ? p1 : p2;
+            const opp = (myRole === 'red') ? p2 : p1;
+            
+            if (Math.abs(me.x - gridX) + Math.abs(me.y - gridY) === 1) {
+                if (!(gridX === opp.x && gridY === opp.y) && !hasWallBlock(me.x, me.y, gridX, gridY)) {
+                    me.x = gridX;
+                    me.y = gridY;
+                    conn.send({ type: 'move', x: gridX, y: gridY });
+                    playSynthSFX('move');
+                    endTurn();
+                } else {
+                    playSynthSFX('error');
+                }
+            }
+        });
+
+        function endTurn() {
+            const me = (myRole === 'red') ? p1 : p2;
+            const targetY = (myRole === 'red') ? 0 : 8;
+            if (me.y === targetY) {
+                playSynthSFX('win');
+                setTimeout(() => { alert("VICTORY SECURED!"); location.reload(); }, 200);
+                return;
+            }
+
+            currentTurn = (currentTurn === 'red') ? 'blue' : 'red';
+            updateStatus();
+            draw();
+        }
+
+        // --- Graphic Rendering Pipeline ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Digital Background Grid lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 1;
+            ctx.shadowBlur = 0;
+            for (let i = 0; i <= gridSize; i++) {
+                ctx.beginPath(); ctx.moveTo(i * cellSize, 0); ctx.lineTo(i * cellSize, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i * cellSize); ctx.lineTo(canvas.width, i * cellSize); ctx.stroke();
+            }
+
+            // 2. Goal Zone Illuminations
+            ctx.fillStyle = 'rgba(255, 51, 102, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, cellSize);
+            ctx.fillStyle = 'rgba(0, 240, 255, 0.05)';
+            ctx.fillRect(0, canvas.height - cellSize, canvas.width, cellSize);
+
+            // 3. Render Permanent Barriers
+            for (let w of walls) {
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = '#ffaa00';
+                ctx.fillStyle = '#ffcc66';
+                if (w.type === 'h') {
+                    ctx.fillRect(w.x * cellSize + 2, (w.y + 1) * cellSize - 3, cellSize * 3 - 4, 6);
+                } else {
+                    ctx.fillRect((w.x + 1) * cellSize - 3, w.y * cellSize + 2, 6, cellSize * 3 - 4);
+                }
+            }
+
+            // 4. Render Drag and Drop Low-Opacity Ghost Clone
+            if (activeDragType && currentPointerGrid) {
+                const { x, y } = currentPointerGrid;
+                const valid = isValidWall(x, y, activeDragType);
+                
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = valid ? 'var(--accent-blue)' : 'var(--accent-red)';
+                ctx.fillStyle = valid ? 'rgba(0, 240, 255, 0.35)' : 'rgba(255, 51, 102, 0.4)';
+
+                if (activeDragType === 'h') {
+                    ctx.fillRect(x * cellSize + 2, (y + 1) * cellSize - 4, cellSize * 3 - 4, 8);
+                } else {
+                    ctx.fillRect((x + 1) * cellSize - 4, y * cellSize + 2, 8, cellSize * 3 - 4);
+                }
+            }
+
+            // 5. Player Core Objects
+            drawPlayer(p1.x, p1.y, '#ff3366');
+            drawPlayer(p2.x, p2.y, '#00f0ff');
+        }
+
+        function drawPlayer(x, y, solidColor) {
+            ctx.save();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = solidColor;
+            
+            ctx.beginPath();
+            ctx.arc(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, cellSize / 3, 0, 2 * Math.PI);
+            ctx.fillStyle = solidColor;
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, cellSize / 6, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        // Initial setup run
+        draw(); 
+    </script>
+</body>
+</html>
