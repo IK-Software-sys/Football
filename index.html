@@ -3,102 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>P2P Wall Game</title>
+    <title>Neon Gridlock - P2P</title>
     <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
     <style>
+        :root {
+            --bg-color: #0a0a12;
+            --panel-bg: rgba(25, 25, 35, 0.85);
+            --text-color: #e2e8f0;
+            --accent-red: #ff3366;
+            --accent-blue: #00f0ff;
+            --accent-wall: #ffaa00;
+            --border-glow: rgba(255, 255, 255, 0.1);
+        }
+
         body {
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
-            padding: 10px;
-            background-color: #f0f0f0;
+            padding: 15px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             display: flex;
             flex-direction: column;
             align-items: center;
-            touch-action: manipulation; /* Prevents zooming on double tap on mobile */
+            min-height: 100vh;
+            box-sizing: border-box;
+            touch-action: manipulation;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(255, 51, 102, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(0, 240, 255, 0.15) 0px, transparent 50%);
         }
-        #network-panel {
-            background: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            margin-bottom: 10px;
+
+        /* Glassmorphism Panels */
+        #network-panel, #game-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glow);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
             width: 100%;
             max-width: 400px;
             box-sizing: border-box;
+            margin-bottom: 15px;
         }
-        input, button {
-            padding: 8px;
-            margin: 5px 0;
+
+        h3 {
+            margin-top: 0;
+            text-align: center;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            background: linear-gradient(45deg, var(--accent-red), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #my-id {
+            color: var(--accent-blue);
+            background: rgba(0, 240, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        input {
+            background: rgba(25, 25, 35, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 12px 0;
             width: 100%;
             box-sizing: border-box;
             font-size: 16px;
+            transition: all 0.3s ease;
         }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+
+        button {
+            background: linear-gradient(135deg, #1e1e30, #2d2d44);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #connect-btn {
+            background: linear-gradient(135deg, #00b4d8, #0077b6);
+            border: none;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #connect-btn:hover {
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+        }
+
         #game-panel {
             display: none;
-            width: 100%;
-            max-width: 400px;
+        }
+
+        #status {
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 20px;
             text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px rgba(255,255,255,0.2);
         }
-        canvas {
-            background: #dcb37b;
-            border: 2px solid #555;
-            border-radius: 4px;
-            max-width: 100%;
-            height: auto;
-            margin-top: 10px;
-        }
+
+        /* Futuristic Controls */
         .controls {
             display: flex;
             justify-content: space-between;
-            margin-top: 10px;
+            margin-bottom: 15px;
+            gap: 8px;
         }
+
         .controls button {
             flex: 1;
-            margin: 0 5px;
-            background-color: #ddd;
-            border: 1px solid #aaa;
-            border-radius: 4px;
-            padding: 10px 5px;
+            font-size: 13px;
+            padding: 10px 2px;
+            text-transform: uppercase;
+            border: 1px solid rgba(255,255,255,0.05);
         }
-        .controls button.active {
-            background-color: #888;
-            color: white;
-            font-weight: bold;
+
+        .controls button#btn-move.active {
+            border-color: #fff;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
+            background: rgba(255,255,255,0.15);
         }
-        #status {
-            font-weight: bold;
-            margin: 10px 0;
-            font-size: 18px;
+        .controls button#btn-hwall.active, .controls button#btn-vwall.active {
+            border-color: var(--accent-wall);
+            box-shadow: 0 0 12px rgba(255, 170, 0, 0.4);
+            background: rgba(255, 170, 0, 0.15);
+            color: var(--accent-wall);
+        }
+
+        /* Canvas Wrap for Neo-Glow Glow Effect */
+        .canvas-container {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        canvas {
+            background: #12121c;
+            display: block;
+            max-width: 100%;
+            height: auto;
         }
     </style>
 </head>
 <body>
 
     <div id="network-panel">
-        <h3>Multiplayer Connection</h3>
-        <p>Your ID: <strong id="my-id">Connecting...</strong></p>
-        <p><i>Share this ID with your opponent, or connect to theirs.</i></p>
-        <hr>
-        <input type="text" id="opponent-id" placeholder="Enter Opponent ID">
-        <button id="connect-btn">Connect & Play</button>
-        <p id="connection-status"></p>
+        <h3>Neon Gridlock</h3>
+        <p style="text-align:center; margin-bottom:20px;">Your Core ID:<br><br><strong id="my-id">Initializing...</strong></p>
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0;">
+        <input type="text" id="opponent-id" placeholder="Enter Enemy Core ID">
+        <button id="connect-btn">Establish Link</button>
+        <p id="connection-status" style="text-align:center; color: var(--accent-wall); font-size:14px;"></p>
     </div>
 
     <div id="game-panel">
-        <div id="status">Waiting for connection...</div>
+        <div id="status">Syncing System...</div>
         <div class="controls">
-            <button id="btn-move" class="active" onclick="setMode('move')">Move</button>
-            <button id="btn-hwall" onclick="setMode('hwall')">H-Wall (3)</button>
-            <button id="btn-vwall" onclick="setMode('vwall')">V-Wall (3)</button>
+            <button id="btn-move" class="active" onclick="setMode('move')">Navigate</button>
+            <button id="btn-hwall" onclick="setMode('hwall')">H-Barrier</button>
+            <button id="btn-vwall" onclick="setMode('vwall')">V-Barrier</button>
         </div>
-        <canvas id="gameCanvas" width="360" height="360"></canvas>
+        <div class="canvas-container">
+            <canvas id="gameCanvas" width="360" height="360"></canvas>
+        </div>
     </div>
 
     <script>
         // --- Network & P2P Setup ---
         const peer = new Peer();
         let conn = null;
-        let myRole = null; // 'red' (Host/P1) or 'blue' (Guest/P2)
+        let myRole = null; 
         
         peer.on('open', (id) => {
             document.getElementById('my-id').innerText = id;
@@ -107,17 +209,17 @@
         peer.on('connection', (connection) => {
             conn = connection;
             setupConnection();
-            startGameAs('red'); // If someone connects to us, we are Red (Host)
+            startGameAs('red');
         });
 
         document.getElementById('connect-btn').onclick = () => {
             const oppId = document.getElementById('opponent-id').value;
             if (!oppId) return;
-            document.getElementById('connection-status').innerText = "Connecting...";
+            document.getElementById('connection-status').innerText = "Routing connection...";
             conn = peer.connect(oppId);
             conn.on('open', () => {
                 setupConnection();
-                startGameAs('blue'); // If we connect to someone, we are Blue (Guest)
+                startGameAs('blue');
             });
         };
 
@@ -126,7 +228,6 @@
             document.getElementById('game-panel').style.display = 'block';
             
             conn.on('data', (data) => {
-                // Receive opponent's action
                 if (data.type === 'move') {
                     if (myRole === 'red') { p2.x = data.x; p2.y = data.y; }
                     else { p1.x = data.x; p1.y = data.y; }
@@ -145,12 +246,12 @@
         const gridSize = 9;
         const cellSize = canvas.width / gridSize;
         
-        let p1 = { x: 4, y: 8 }; // Red (needs to reach y = 0)
-        let p2 = { x: 4, y: 0 }; // Blue (needs to reach y = 8)
-        let walls = []; // Array of {x, y, type: 'h'|'v'}
+        let p1 = { x: 4, y: 8 }; // Neon Red
+        let p2 = { x: 4, y: 0 }; // Neon Blue
+        let walls = []; 
         
         let currentTurn = 'red';
-        let actionMode = 'move'; // 'move', 'hwall', 'vwall'
+        let actionMode = 'move'; 
 
         function startGameAs(role) {
             myRole = role;
@@ -168,23 +269,24 @@
         function updateStatus() {
             const statusDiv = document.getElementById('status');
             if (currentTurn === myRole) {
-                statusDiv.innerText = "Your Turn (" + myRole.toUpperCase() + ")";
-                statusDiv.style.color = myRole;
+                statusDiv.innerText = "YOUR TURN";
+                statusDiv.style.color = myRole === 'red' ? 'var(--accent-red)' : 'var(--accent-blue)';
+                statusDiv.style.textShadow = `0 0 15px ${statusDiv.style.color}`;
             } else {
-                statusDiv.innerText = "Opponent's Turn";
-                statusDiv.style.color = "black";
+                statusDiv.innerText = "ENEMY TURN";
+                statusDiv.style.color = "rgba(255,255,255,0.4)";
+                statusDiv.style.textShadow = "none";
             }
         }
 
         // --- Core Rules & Pathfinding ---
         function hasWallBlock(x1, y1, x2, y2) {
-            // Check if there is a wall blocking movement between cell (x1,y1) and (x2,y2)
-            if (x1 === x2) { // Vertical move, check horizontal walls
+            if (x1 === x2) { 
                 let minY = Math.min(y1, y2);
                 for (let w of walls) {
                     if (w.type === 'h' && w.y === minY && (x1 >= w.x && x1 <= w.x + 2)) return true;
                 }
-            } else if (y1 === y2) { // Horizontal move, check vertical walls
+            } else if (y1 === y2) { 
                 let minX = Math.min(x1, x2);
                 for (let w of walls) {
                     if (w.type === 'v' && w.x === minX && (y1 >= w.y && y1 <= w.y + 2)) return true;
@@ -194,7 +296,6 @@
         }
 
         function canReachGoal(player, targetY) {
-            // Breadth-First Search to ensure the path isn't completely blocked
             let queue = [{ x: player.x, y: player.y }];
             let visited = new Set([`${player.x},${player.y}`]);
 
@@ -222,17 +323,14 @@
         }
 
         function isValidWall(wx, wy, type) {
-            // Out of bounds check (wall is 3 blocks long)
             if (type === 'h' && (wx > 6 || wy >= 8)) return false;
             if (type === 'v' && (wy > 6 || wx >= 8)) return false;
 
-            // Overlap check
             for (let w of walls) {
                 if (w.type === type) {
                     if (type === 'h' && w.y === wy && Math.abs(w.x - wx) < 3) return false;
                     if (type === 'v' && w.x === wx && Math.abs(w.y - wy) < 3) return false;
                 } else {
-                    // Cross intersection check
                     if (type === 'h' && w.type === 'v') {
                         if (wx <= w.x && wx + 2 >= w.x && wy >= w.y && wy <= w.y + 2) return false;
                     }
@@ -242,11 +340,10 @@
                 }
             }
 
-            // Blocking check: temporarily add wall and run BFS
             walls.push({ x: wx, y: wy, type: type });
             let p1CanWin = canReachGoal(p1, 0);
             let p2CanWin = canReachGoal(p2, 8);
-            walls.pop(); // remove temp wall
+            walls.pop(); 
 
             return p1CanWin && p2CanWin;
         }
@@ -258,16 +355,16 @@
             const rect = canvas.getBoundingClientRect();
             const cx = e.clientX - rect.left;
             const cy = e.clientY - rect.top;
-            const gridX = Math.floor(cx / cellSize);
-            const gridY = Math.floor(cy / cellSize);
+            
+            // Scaled grid math to maintain precision during CSS resizing
+            const gridX = Math.floor((cx / rect.width) * gridSize);
+            const gridY = Math.floor((cy / rect.height) * gridSize);
 
             if (actionMode === 'move') {
                 const me = (myRole === 'red') ? p1 : p2;
                 const opp = (myRole === 'red') ? p2 : p1;
                 
-                // Check if move is exactly 1 square away (no diagonals)
                 if (Math.abs(me.x - gridX) + Math.abs(me.y - gridY) === 1) {
-                    // Check collision with opponent and walls
                     if (!(gridX === opp.x && gridY === opp.y) && !hasWallBlock(me.x, me.y, gridX, gridY)) {
                         me.x = gridX;
                         me.y = gridY;
@@ -277,24 +374,20 @@
                     }
                 }
             } else {
-                // Wall Placement
                 const type = (actionMode === 'hwall') ? 'h' : 'v';
                 if (isValidWall(gridX, gridY, type)) {
                     walls.push({ x: gridX, y: gridY, type: type });
                     conn.send({ type: 'wall', x: gridX, y: gridY, wallType: type });
                     endTurn();
-                } else {
-                    alert("Invalid wall placement! You cannot block the path entirely or overlap walls.");
                 }
             }
         });
 
         function endTurn() {
-            // Check win condition
             const me = (myRole === 'red') ? p1 : p2;
             const targetY = (myRole === 'red') ? 0 : 8;
             if (me.y === targetY) {
-                alert("You Win!");
+                alert("VICTORY ACHIEVED!");
             }
 
             currentTurn = (currentTurn === 'red') ? 'blue' : 'red';
@@ -303,50 +396,64 @@
             draw();
         }
 
-        // --- Rendering ---
+        // --- Engine Rendering with Light FX ---
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Grid
-            ctx.strokeStyle = '#a47c4b';
+            // 1. Draw Grid Lines with low opacity digital styling
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
             ctx.lineWidth = 1;
+            ctx.shadowBlur = 0; // Clear blur for lines
             for (let i = 0; i <= gridSize; i++) {
-                ctx.beginPath();
-                ctx.moveTo(i * cellSize, 0);
-                ctx.lineTo(i * cellSize, canvas.height);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(0, i * cellSize);
-                ctx.lineTo(canvas.width, i * cellSize);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(i * cellSize, 0); ctx.lineTo(i * cellSize, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i * cellSize); ctx.lineTo(canvas.width, i * cellSize); ctx.stroke();
             }
 
-            // Draw Walls
-            ctx.fillStyle = '#333';
+            // 2. Draw Endzone lighting indicators
+            ctx.fillStyle = 'rgba(255, 51, 102, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, cellSize);
+            ctx.fillStyle = 'rgba(0, 240, 255, 0.05)';
+            ctx.fillRect(0, canvas.height - cellSize, canvas.width, cellSize);
+
+            // 3. Draw Neon Energy Walls
             for (let w of walls) {
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = '#ffaa00';
+                ctx.fillStyle = '#ffcc66';
+                
                 if (w.type === 'h') {
-                    ctx.fillRect(w.x * cellSize, (w.y + 1) * cellSize - 4, cellSize * 3, 8);
+                    ctx.fillRect(w.x * cellSize + 2, (w.y + 1) * cellSize - 3, cellSize * 3 - 4, 6);
                 } else {
-                    ctx.fillRect((w.x + 1) * cellSize - 4, w.y * cellSize, 8, cellSize * 3);
+                    ctx.fillRect((w.x + 1) * cellSize - 3, w.y * cellSize + 2, 6, cellSize * 3 - 4);
                 }
             }
 
-            // Draw Players
-            drawPlayer(p1.x, p1.y, 'red');
-            drawPlayer(p2.x, p2.y, 'blue');
+            // 4. Draw Core Orbs (Players)
+            drawPlayer(p1.x, p1.y, '#ff3366', 'rgba(255, 51, 102, 0.6)');
+            drawPlayer(p2.x, p2.y, '#00f0ff', 'rgba(0, 240, 255, 0.6)');
         }
 
-        function drawPlayer(x, y, color) {
+        function drawPlayer(x, y, solidColor, glowColor) {
+            ctx.save();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = solidColor;
+            
+            // Outer Ring
             ctx.beginPath();
             ctx.arc(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, cellSize / 3, 0, 2 * Math.PI);
-            ctx.fillStyle = color;
+            ctx.fillStyle = solidColor;
             ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            
+            // Inner Core Light
+            ctx.beginPath();
+            ctx.arc(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, cellSize / 6, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            
+            ctx.restore();
         }
 
-        draw(); // Initial render
+        draw(); 
     </script>
 </body>
 </html>
