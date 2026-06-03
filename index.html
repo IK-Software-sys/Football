@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Gridlock - P2P</title>
+    <title>Neon Gridlock - P2P Fixed</title>
     <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
     <style>
         :root {
@@ -33,7 +33,6 @@
                 radial-gradient(at 100% 100%, rgba(0, 240, 255, 0.15) 0px, transparent 50%);
         }
 
-        /* Glassmorphism Panels */
         #network-panel, #game-panel {
             background: var(--panel-bg);
             backdrop-filter: blur(12px);
@@ -61,10 +60,12 @@
         #my-id {
             color: var(--accent-blue);
             background: rgba(0, 240, 255, 0.1);
-            padding: 4px 8px;
+            padding: 6px 10px;
             border-radius: 4px;
             font-family: monospace;
             word-break: break-all;
+            display: inline-block;
+            margin-top: 5px;
         }
 
         input {
@@ -97,6 +98,7 @@
             font-size: 16px;
             transition: all 0.2s ease;
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            width: 100%;
         }
 
         button:active {
@@ -110,10 +112,6 @@
             letter-spacing: 1px;
         }
 
-        #connect-btn:hover {
-            box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
-        }
-
         #game-panel {
             display: none;
         }
@@ -125,10 +123,8 @@
             text-align: center;
             text-transform: uppercase;
             letter-spacing: 1px;
-            text-shadow: 0 0 10px rgba(255,255,255,0.2);
         }
 
-        /* Futuristic Controls */
         .controls {
             display: flex;
             justify-content: space-between;
@@ -141,7 +137,6 @@
             font-size: 13px;
             padding: 10px 2px;
             text-transform: uppercase;
-            border: 1px solid rgba(255,255,255,0.05);
         }
 
         .controls button#btn-move.active {
@@ -156,12 +151,11 @@
             color: var(--accent-wall);
         }
 
-        /* Canvas Wrap for Neo-Glow Glow Effect */
         .canvas-container {
             position: relative;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 0 25px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255,255,255,0.05);
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
             border: 1px solid rgba(255,255,255,0.1);
         }
 
@@ -177,11 +171,11 @@
 
     <div id="network-panel">
         <h3>Neon Gridlock</h3>
-        <p style="text-align:center; margin-bottom:20px;">Your Core ID:<br><br><strong id="my-id">Initializing...</strong></p>
+        <p style="text-align:center; margin-bottom:20px;">Your Core ID:<br><strong id="my-id">Initializing...</strong></p>
         <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0;">
         <input type="text" id="opponent-id" placeholder="Enter Enemy Core ID">
         <button id="connect-btn">Establish Link</button>
-        <p id="connection-status" style="text-align:center; color: var(--accent-wall); font-size:14px;"></p>
+        <p id="connection-status" style="text-align:center; color: var(--accent-wall); font-size:14px; margin-top: 15px; word-break: break-all;"></p>
     </div>
 
     <div id="game-panel">
@@ -197,26 +191,64 @@
     </div>
 
     <script>
-        // --- Network & P2P Setup ---
-        const peer = new Peer();
+        // --- Hardened Network Config ---
+        // Adding explicit Google ICE (STUN) servers to bypass strict NAT routers/cellular firewalls
+        const peerConfig = {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' }
+                ]
+            }
+        };
+
+        const peer = new Peer(peerConfig);
         let conn = null;
         let myRole = null; 
         
+        const statusText = document.getElementById('connection-status');
+
         peer.on('open', (id) => {
             document.getElementById('my-id').innerText = id;
+            statusText.innerText = "Ready for connection.";
         });
 
-        peer.on('connection', (connection) => {
-            conn = connection;
+        // Error Handling System
+        peer.on('error', (err) => {
+            console.error("PeerJS Error:", err.type, err);
+            if (err.type === 'peer-unavailable') {
+                statusText.innerText = "Error: Target ID not found. Check for typos.";
+            } else if (err.type === 'network') {
+                statusText.innerText = "Error: Lost connection to signaling server.";
+            } else if (err.type === 'browser-incompatible') {
+                statusText.innerText = "Error: WebRTC is not supported by this browser.";
+            } else {
+                statusText.innerText = `System Error: ${err.type}`;
+            }
+        });
+
+        // Handle incoming connection (Host side)
+        peer.on('connection', (incomingConn) => {
+            conn = incomingConn;
+            statusText.innerText = "Handshake detected... Connecting.";
             setupConnection();
             startGameAs('red');
         });
 
+        // Initiate connection (Guest side)
         document.getElementById('connect-btn').onclick = () => {
-            const oppId = document.getElementById('opponent-id').value;
-            if (!oppId) return;
-            document.getElementById('connection-status').innerText = "Routing connection...";
-            conn = peer.connect(oppId);
+            const oppId = document.getElementById('opponent-id').value.trim();
+            if (!oppId) {
+                statusText.innerText = "Please enter an ID first.";
+                return;
+            }
+            statusText.innerText = "Routing through STUN servers...";
+            
+            conn = peer.connect(oppId, { reliable: true });
+            
             conn.on('open', () => {
                 setupConnection();
                 startGameAs('blue');
@@ -237,6 +269,11 @@
                 currentTurn = (currentTurn === 'red') ? 'blue' : 'red';
                 updateStatus();
                 draw();
+            });
+
+            conn.on('close', () => {
+                alert("Opponent disconnected.");
+                location.reload();
             });
         }
 
@@ -356,7 +393,6 @@
             const cx = e.clientX - rect.left;
             const cy = e.clientY - rect.top;
             
-            // Scaled grid math to maintain precision during CSS resizing
             const gridX = Math.floor((cx / rect.width) * gridSize);
             const gridY = Math.floor((cy / rect.height) * gridSize);
 
@@ -396,26 +432,23 @@
             draw();
         }
 
-        // --- Engine Rendering with Light FX ---
+        // --- Engine Rendering ---
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Draw Grid Lines with low opacity digital styling
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
             ctx.lineWidth = 1;
-            ctx.shadowBlur = 0; // Clear blur for lines
+            ctx.shadowBlur = 0; 
             for (let i = 0; i <= gridSize; i++) {
                 ctx.beginPath(); ctx.moveTo(i * cellSize, 0); ctx.lineTo(i * cellSize, canvas.height); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(0, i * cellSize); ctx.lineTo(canvas.width, i * cellSize); ctx.stroke();
             }
 
-            // 2. Draw Endzone lighting indicators
             ctx.fillStyle = 'rgba(255, 51, 102, 0.05)';
             ctx.fillRect(0, 0, canvas.width, cellSize);
             ctx.fillStyle = 'rgba(0, 240, 255, 0.05)';
             ctx.fillRect(0, canvas.height - cellSize, canvas.width, cellSize);
 
-            // 3. Draw Neon Energy Walls
             for (let w of walls) {
                 ctx.shadowBlur = 12;
                 ctx.shadowColor = '#ffaa00';
@@ -428,23 +461,20 @@
                 }
             }
 
-            // 4. Draw Core Orbs (Players)
-            drawPlayer(p1.x, p1.y, '#ff3366', 'rgba(255, 51, 102, 0.6)');
-            drawPlayer(p2.x, p2.y, '#00f0ff', 'rgba(0, 240, 255, 0.6)');
+            drawPlayer(p1.x, p1.y, '#ff3366');
+            drawPlayer(p2.x, p2.y, '#00f0ff');
         }
 
-        function drawPlayer(x, y, solidColor, glowColor) {
+        function drawPlayer(x, y, solidColor) {
             ctx.save();
             ctx.shadowBlur = 20;
             ctx.shadowColor = solidColor;
             
-            // Outer Ring
             ctx.beginPath();
             ctx.arc(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, cellSize / 3, 0, 2 * Math.PI);
             ctx.fillStyle = solidColor;
             ctx.fill();
             
-            // Inner Core Light
             ctx.beginPath();
             ctx.arc(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, cellSize / 6, 0, 2 * Math.PI);
             ctx.fillStyle = '#ffffff';
